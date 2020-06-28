@@ -1,0 +1,130 @@
+#!/bin/bash
+
+# Note: this function is a substitute for "readlink -f"
+# which may not be supported on non-Gnu Unix derivatives
+function portableReadlink() {
+
+   TARGET_FILE="$1"
+   # If argument is a directory do this...
+   if [ -d "${TARGET_FILE}" ] ; then
+      pushd "$TARGET_FILE" &> /dev/null
+      if [ $? -ne 0 ] ; then
+         return 1
+      fi
+      # Compute the canonicalized name by finding the physical path
+      # for the directory we're in and appending the target file.
+      PHYS_DIR="$(pwd -P)"
+      RESULT="$PHYS_DIR"
+      if [ -e "${RESULT}" ] ; then
+         echo "${RESULT}"
+         popd &> /dev/null
+         return 0
+      else
+         popd &> /dev/null
+         return 1
+      fi
+   else
+      DIR_NAME="$(dirname "$TARGET_FILE")"
+      pushd "$DIR_NAME" &> /dev/null
+      if [ $? -ne 0 ] ; then
+         return 1
+      fi
+      TARGET_FILE="$(basename "$TARGET_FILE")"
+
+      # Iterate down a (possible) chain of symlinks
+      while [ -L "$TARGET_FILE" ]
+      do
+         TARGET_FILE="$(readlink "$TARGET_FILE")"
+         if [ $? -ne 0 ] ; then
+            popd &> /dev/null
+            return 1
+         fi
+         cd "$(dirname "$TARGET_FILE")"
+         if [ $? -ne 0 ] ; then
+            popd &> /dev/null
+            return 1
+         fi
+         TARGET_FILE="$(basename "$TARGET_FILE")"
+      done
+      PHYS_DIR="$(pwd -P)"
+      RESULT="${PHYS_DIR}/${TARGET_FILE}"
+      if [ -e "${RESULT}" ] ; then
+         echo "${RESULT}"
+         popd &> /dev/null
+         return 0
+      else
+         popd &> /dev/null
+         return 1
+      fi
+   fi
+}
+
+export -f portableReadlink
+
+######################################################
+################# BLOCK TO PHONE HOME ################
+# This can be used to find installation directory
+# no matter how this script is referenced/linked or
+# put in the PATH or whatever
+
+BASENAME=$(basename "$0")
+if [ "$0" == "${0#/}" ]
+then
+    SCRIPTS_RELATIVE_PATH="$PWD"/"${0%/*}"
+else
+    SCRIPTS_RELATIVE_PATH="${0%/*}"
+fi
+PATH_TO_EXEC="$(portableReadlink "${SCRIPTS_RELATIVE_PATH}/${BASENAME}")"
+
+# QUALIFIED_PATH is the full path to the script that contains this code.
+export BOOTSTRAP_TOP_DIR="$(dirname "${PATH_TO_EXEC}")"
+
+############### END BLOCK TO PHONE HOME ##############
+######################################################
+
+saveddir="$(pwd)"
+
+export BOOTSTRAP_CACHE_DIR="${HOME}/.cache/groovyCache/bootstrapBuild"
+
+source "${BOOTSTRAP_TOP_DIR}/cli/bash/groovyCache.sh"
+
+source "${BOOTSTRAP_TOP_DIR}/cli/bash/bootstraplocatedirectories.sourceme"
+bootstraplocatedirectories
+
+if [ -e "${HOME}/.bootstrap/registries.sourceme" ] ; then
+   source "${HOME}/.bootstrap/registries.sourceme"
+fi
+source "${BOOTSTRAP_TOP_DIR}/registries.sourceme"
+
+findGroovy || exit 1
+
+updateGroovyCache
+
+export CLASSPATH="${BOOTSTRAP_CACHE_DIR}"
+
+loggingFile=info.properties
+enableLogging=false
+for arg in "$@" ; do
+  if [ "$arg" == "-qq" ] ; then
+     loggingFile=off.properties
+  elif [ "$arg" == "-q" ] ; then
+     loggingFile=warning.properties
+  elif [ "$arg" == "-v" ] ; then
+     loggingFile=fine.properties
+  elif [ "$arg" == "-vv" ] ; then
+     loggingFile=all.properties
+  elif [ "$arg" == "-l" ] ; then
+     enableLogging=true
+#  else
+#     echo "Warning unknown option or bad path: $arg"
+  fi
+done
+
+export JAVA_OPTS="$JAVA_OPTS -Djava.util.logging.config.file=${BOOTSTRAP_TOP_DIR}/cli/config/${loggingFile}"
+
+cd "${BOOTSTRAP_TOP_DIR}/cli"
+
+# The below line includes a kludge to filter out lines printed by Groovy and Java which
+# are not appropriate to show the user. Hopefully a clean up of the Groovy implementation
+# will clean up its output in the future so that this unsavory hack can be removed.
+groovy -cp "${CLASSPATH}" bootstrap.groovy "$@" 2>&1 | grep -ve "^WARNING:" | grep -ve "^Picked up"

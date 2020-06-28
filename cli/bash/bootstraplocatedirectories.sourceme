@@ -1,0 +1,83 @@
+#!/bin/bash
+############################################################################
+# Helper functions to locate hatchery, nest and local directories. 
+#
+# BootstrapBuild - a powerful but easy tool to build and install modular
+#   applications in a Unix environment that supports Bash shell.
+#
+# Copyright Adaptive Methods 2017
+# Authors: Ryan Fogarty, Charles J. Remeikas
+#
+############################################################################
+
+function bootstraplocatedirectories() {
+
+#   local verbose=0
+#   for arg in "$@" ; do
+#      if [ "$arg" == "-v" ] ; then
+#         local verbose=1
+#      fi
+#   done
+
+   if [ -z "${BOOTSTRAP_BUILD_WORKING_DIR}" ] ; then
+      dirContents="$(ls -1)"
+      if [ -z "${dirContents}" ] ; then
+         export BOOTSTRAP_BUILD_WORKING_DIR="$(pwd)"
+      elif [[ "${dirContents}" =~ hatchery && \
+              "${dirContents}" =~ nest && \
+              "${dirContents}" =~ local ]] ; then
+         export BOOTSTRAP_BUILD_WORKING_DIR="$(pwd)"
+      else
+#         export BOOTSTRAP_BUILD_WORKING_DIR=~/.bootstrapBuild
+         echo "Bootstrap build needs to be run initially from any empty directoy (which creates new flock)"
+         echo "   or in a directory that contains sub-directories: hatchery, nest, and local"
+         echo "   or \${BOOTSTRAP_BUILD_WORKING_DIR} needs to be defined and exported in the environment"
+         exit 1
+      fi
+   fi
+
+   # Make directories for when environment variables aren't set
+   mkdir -p "${BOOTSTRAP_BUILD_WORKING_DIR}"
+
+   # If certain environment variables are not set, let's set them here
+   
+   if [ -z "${BOOTSTRAP_BUILD_HATCHERY}" ] ; then
+      # The hatchery is where bootstrap build macros go
+      mkdir -p "${BOOTSTRAP_BUILD_WORKING_DIR}/hatchery"
+      export BOOTSTRAP_BUILD_HATCHERY="$(portableReadlink "${BOOTSTRAP_BUILD_WORKING_DIR}/hatchery")"
+   else
+#   elif [ $verbose -eq 1 ] ; then
+      # The hatchery is where bootstrap build macros go
+      mkdir -p "${BOOTSTRAP_BUILD_HATCHERY}"
+#      bootstrapLog $BOOTSTRAP_LOG_INFO "BOOTSTRAP_BUILD_HATCHERY variable is defined in the environment."
+#      bootstrapLog $BOOTSTRAP_LOG_INFO "  Ovums will be placed in: ${BOOTSTRAP_BUILD_HATCHERY}"
+   fi
+   
+   if [ -z "${BOOTSTRAP_BUILD_NESTING_DIR}" ] ; then
+      # The nest is where downloaded products are placed
+      mkdir -p "${BOOTSTRAP_BUILD_WORKING_DIR}/nest"
+      export BOOTSTRAP_BUILD_NESTING_DIR="$(portableReadlink "${BOOTSTRAP_BUILD_WORKING_DIR}/nest")"
+   else
+#   elif [ $verbose -eq 1 ] ; then
+      # The nest is where downloaded products are placed
+      mkdir -p "${BOOTSTRAP_BUILD_NESTING_DIR}"
+#      bootstrapLog $BOOTSTRAP_LOG_INFO "BOOTSTRAP_BUILD_NESTING_DIR variable is defined in the environment."
+#      bootstrapLog $BOOTSTRAP_LOG_INFO "  Nesting products in: ${BOOTSTRAP_BUILD_NESTING_DIR}"
+   fi
+   
+   if [ -z "${BOOTSTRAP_BUILD_INSTALL_DIR}" ] ; then
+      # install directory is given traditional local name
+      mkdir -p "${BOOTSTRAP_BUILD_WORKING_DIR}/local"
+      export BOOTSTRAP_BUILD_INSTALL_DIR="$(portableReadlink "${BOOTSTRAP_BUILD_WORKING_DIR}/local")"
+   else
+#   elif [ $verbose -eq 1 ] ; then
+      # install directory is provided
+      mkdir -p "${BOOTSTRAP_BUILD_INSTALL_DIR}"
+#      bootstrapLog $BOOTSTRAP_LOG_INFO "BOOTSTRAP_BUILD_INSTALL_DIR environment is defined in the environment."
+#      bootstrapLog $BOOTSTRAP_LOG_INFO "  Installing runtime libraries/support in: ${BOOTSTRAP_BUILD_INSTALL_DIR}"
+   fi
+   
+}
+
+export -f bootstraplocatedirectories
+

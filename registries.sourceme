@@ -1,0 +1,1 @@
+export BOOTSTRAP_BUILD_REGISTRIES="${BOOTSTRAP_BUILD_REGISTRIES};git=https://github.com/rfogarty"
